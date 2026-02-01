@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>Statikk_Data</RootNamespace>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Seiori.EnumGenerator" Version="1.0.2" />
+      <PackageReference Include="System.IO.Hashing" Version="10.0.2" />
+      <PackageReference Include="System.Threading.RateLimiting" Version="10.0.2" />
+    </ItemGroup>
+
+</Project>
