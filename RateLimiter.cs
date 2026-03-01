@@ -4,15 +4,21 @@ namespace Statikk_Data;
 
 public sealed class RateLimiter : IAsyncDisposable
 {
-    private const int DefaultLimit = 1;
+    private const int DefaultLimit = 10;
     private static readonly TimeSpan DefaultWindow = TimeSpan.FromSeconds(1);
 
-    private volatile FixedWindowRateLimiter _activeLimiter = CreateLimiter(DefaultLimit, DefaultWindow);
-
-    private int _currentLimit = DefaultLimit;
-    private TimeSpan _currentWindow = DefaultWindow;
+    private volatile FixedWindowRateLimiter _activeLimiter;
+    private int _currentLimit;
+    private TimeSpan _currentWindow;
 
     private readonly SemaphoreSlim _updateLock = new(1, 1);
+
+    public RateLimiter()
+    {
+        _currentLimit = DefaultLimit;
+        _currentWindow = DefaultWindow;
+        _activeLimiter = CreateLimiter(_currentLimit, _currentWindow);
+    }
 
     private static FixedWindowRateLimiter CreateLimiter(int limit, TimeSpan window)
     {
@@ -22,7 +28,7 @@ public sealed class RateLimiter : IAsyncDisposable
             Window = window,
             AutoReplenishment = true,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 100
+            QueueLimit = 1000 
         });
     }
 
@@ -32,25 +38,24 @@ public sealed class RateLimiter : IAsyncDisposable
         
         if (!lease.IsAcquired)
         {
-            throw new InvalidOperationException("The rate limit queue is full. Reduce the number of concurrent tasks or increase the QueueLimit.");
+            throw new InvalidOperationException();
         }
     }
 
     public async ValueTask SyncAsync(int newLimit, TimeSpan newWindow, int serverUsedCount)
     {
-        if (_currentLimit == newLimit && _currentWindow == newWindow && serverUsedCount < newLimit * 0.9)
+        if (_currentLimit == newLimit && _currentWindow == newWindow)
         {
             return;
         }
 
-        FixedWindowRateLimiter? oldLimiter = null;
         await _updateLock.WaitAsync();
 
         try
         {
             if (_currentLimit != newLimit || _currentWindow != newWindow)
             {
-                oldLimiter = _activeLimiter;
+                var oldLimiter = _activeLimiter;
                 var nextLimiter = CreateLimiter(newLimit, newWindow);
 
                 if (serverUsedCount > 0)
@@ -61,16 +66,13 @@ public sealed class RateLimiter : IAsyncDisposable
                 _activeLimiter = nextLimiter;
                 _currentLimit = newLimit;
                 _currentWindow = newWindow;
+
+                await oldLimiter.DisposeAsync();
             }
         }
         finally
         {
             _updateLock.Release();
-        }
-
-        if (oldLimiter is not null)
-        {
-            await oldLimiter.DisposeAsync();
         }
     }
 

@@ -1,4 +1,4 @@
-using Statikk_Data.DTOs;
+using Statikk_Data.DTOs.RiotApi;
 using Statikk_Data.ENUMs;
 
 namespace Statikk_Data.Endpoints;
@@ -7,32 +7,54 @@ public sealed class MatchV5(
     RiotApiClient riotApiClient
 )
 {
-    public async Task<string[]> GetMatchIdsByPuuid(
+    public async Task<string[]> GetMatchIdsByPuuidAsync(
         RegionalRoute regionalRoute,
         string puuid,
         int start = 0,
         int count = 20,
+        long startTime = 0,
         CancellationToken cancellationToken = default
     )
     {
-        return await riotApiClient.SendAsync<string[]>(
+        const string path = "lol/match/v5/matches/by-puuid";
+        Span<char> buffer = stackalloc char[256];
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(regionalRoute));
+
+        url.AppendPath(path);
+        url.AppendPath(puuid);
+        url.AppendPath("ids");
+        url.AppendQuery("queue", 420); 
+        url.AppendQuery("start", start); 
+        url.AppendQuery("count", count);
+        url.AppendQuery("startTime", startTime);
+        
+        return await riotApiClient.SendAsync(
             regionalRoute,
-            nameof(GetMatchIdsByPuuid),
-            $"lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&start={start}&count={count}",
+            Methods.GetMatchIdsByPuuidAsync,
+            url.ToString(),
+            RiotApiJsonContext.Default.StringArray,
             cancellationToken
         ) ?? [];
     }
 
-    public async Task<Match?> GetMatchByMatchId(
+    public async Task<RiotApiMatch?> GetMatchByMatchIdAsync(
         RegionalRoute regionalRoute,
         string matchId,
         CancellationToken cancellationToken = default
     )
     {
-        return await riotApiClient.SendAsync<Match>(
+        const string path = "lol/match/v5/matches";
+        Span<char> buffer = stackalloc char[256];
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(regionalRoute));
+        
+        url.AppendPath(path);
+        url.AppendPath(matchId);
+        
+        return await riotApiClient.SendAsync(
             regionalRoute,
-            nameof(GetMatchByMatchId),
-            $"lol/match/v5/matches/{matchId}",
+            Methods.GetMatchByMatchIdAsync,
+            url.ToString(),
+            RiotApiJsonContext.Default.RiotApiMatch,
             cancellationToken
         );
     }

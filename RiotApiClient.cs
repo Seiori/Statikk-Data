@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json.Serialization.Metadata;
 using Statikk_Data.Endpoints;
 using Statikk_Data.ENUMs;
@@ -12,8 +11,10 @@ public sealed class RiotApiClient
     private readonly HttpClient _httpClient;
     private readonly RiotApiRouteManager _routeManager;
 
-    public LeagueExpV4 LeagueExp { get; }
+    public AccountV1 Account { get; }
+    public LeagueV4 League { get; }
     public MatchV5 MatchV5 { get; }
+    public SummonerV4 SummonerV4 { get; }
     
     private const string AppLimitHeader = "X-App-Rate-Limit";
     private const string AppCountHeader = "X-App-Rate-Limit-Count";
@@ -27,68 +28,79 @@ public sealed class RiotApiClient
         _httpClient = httpClient;
         _routeManager = new RiotApiRouteManager();
         
-        LeagueExp = new LeagueExpV4(this);
+        Account = new AccountV1(this);
+        League = new LeagueV4(this);
         MatchV5 = new MatchV5(this);
+        SummonerV4 = new SummonerV4(this);
     }
     
     public async Task<T?> SendAsync<T>(
-        RegionalRoute regionalRoute, 
-        string method, 
-        string endpoint, 
+        RegionalRoute regionalRoute,
+        Methods method, 
+        string url, 
+        JsonTypeInfo<T> typeInfo,
         CancellationToken ct
     )
     {
-        var regionalRouteStr = regionalRoute.GetStringLowerCase();
-        var baseUrl = RiotApi.GetUrl(regionalRoute);
-        var url = $"{baseUrl}/{endpoint}";
-        return await SendInternalAsync<T>(regionalRouteStr, method, url, ct);
+        var routeRateLimiter = _routeManager.RegionalRateLimiters[regionalRoute];
+        var routeMethodRateLimiter = _routeManager.RegionalMethodRateLimiters[(regionalRoute, method)];
+        
+        return await SendInternalAsync(routeRateLimiter, routeMethodRateLimiter, url, typeInfo, ct);
     }
 
-    public async Task<T?> SendAsync<T>(
+    public async Task<T> SendAsync<T>(
         PlatformRoute platformRoute,
-        string method,
-        string endpoint,
+        Methods method,
+        string url,
+        JsonTypeInfo<T> typeInfo,
         CancellationToken cancellationToken
     )
     {
-        var platformRouteStr = platformRoute.GetStringLowerCase();
-        var baseUrl = RiotApi.GetUrl(platformRoute);
-        var url = $"{baseUrl}/{endpoint}";
-        return await SendInternalAsync<T>(platformRouteStr, method, url, cancellationToken);
+        var routeRateLimiter = _routeManager.PlatformRateLimiters[platformRoute];
+        var routeMethodRateLimiter = _routeManager.PlatformMethodRateLimiters[(platformRoute, method)];
+        
+        return await SendInternalAsync(routeRateLimiter, routeMethodRateLimiter, url, typeInfo, cancellationToken);
     }
 
-    private async Task<T?> SendInternalAsync<T>(
-        string route, 
-        string method, 
+    private async Task<T> SendInternalAsync<T>(
+        RateLimiter routeRateLimiter,
+        RateLimiter routeMethodRateLimiter,
         string url, 
+        JsonTypeInfo<T> typeInfo,
         CancellationToken cancellationToken
     )
     {
-        var appRateLimiter = _routeManager.AppRateLimiters.GetOrAdd(route, _ => new RateLimiter());
-        var methodRateLimiter = _routeManager.MethodRateLimiters.GetOrAdd((route, method), _ => new RateLimiter());
-
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            await appRateLimiter.WaitAsync(cancellationToken);
-            await methodRateLimiter.WaitAsync(cancellationToken);
-
-            using var response = await _httpClient.GetAsync(url, cancellationToken);
-
-            await SyncAll(appRateLimiter, methodRateLimiter, response.Headers);
-
-            if (response.StatusCode is HttpStatusCode.TooManyRequests)
+            try
             {
-                var retryAfter = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5);
-                await Task.Delay(retryAfter, cancellationToken);
-                continue;
-            }
+                await routeRateLimiter.WaitAsync(cancellationToken);
+                await routeMethodRateLimiter.WaitAsync(cancellationToken);
 
-            response.EnsureSuccessStatusCode();
-        
-            return await response.Content.ReadFromJsonAsync((JsonTypeInfo<T>)RiotApiJsonContext.Default.GetTypeInfo(typeof(T))!, cancellationToken);
+                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+                await SyncAll(routeRateLimiter, routeMethodRateLimiter, response.Headers);
+
+                if (response.StatusCode is HttpStatusCode.TooManyRequests)
+                {
+                    var retryAfter = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5);
+                    await Task.Delay(retryAfter, cancellationToken);
+                    continue;
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var result = await System.Text.Json.JsonSerializer.DeserializeAsync(stream, typeInfo, cancellationToken);
+                return result;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            }
         }
-        
-        throw new Exception("Failed to send request after multiple attempts due to rate limiting.");
+
+        return default;
     }
 
     private static async ValueTask SyncAll(
@@ -113,17 +125,24 @@ public sealed class RiotApiClient
     private static bool TryGetSegments(HttpResponseHeaders h, string lKey, string cKey, out ReadOnlySpan<char> lSeg, out ReadOnlySpan<char> cSeg)
     {
         lSeg = default; cSeg = default;
-        if (!h.TryGetValues(lKey, out var lVal) || !h.TryGetValues(cKey, out var cVal)) return false;
+    
+        if (!h.NonValidated.TryGetValues(lKey, out var lVal) || 
+            !h.NonValidated.TryGetValues(cKey, out var cVal)) 
+            return false;
 
-        lSeg = GetFirst(lVal.First());
-        cSeg = GetFirst(cVal.First());
+        lSeg = GetFirstFromHeaderValues(lVal);
+        cSeg = GetFirstFromHeaderValues(cVal);
         return true;
 
-        static ReadOnlySpan<char> GetFirst(string s)
+        static ReadOnlySpan<char> GetFirstFromHeaderValues(HeaderStringValues values)
         {
-            var span = s.AsSpan();
-            var idx = span.IndexOf(',');
-            return idx == -1 ? span : span[..idx];
+            foreach (var val in values)
+            {
+                var span = val.AsSpan();
+                var idx = span.IndexOf(',');
+                return idx == -1 ? span : span[..idx];
+            }
+            return default;
         }
     }
 

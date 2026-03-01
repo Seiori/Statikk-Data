@@ -1,18 +1,18 @@
 using System.Text.Json.Serialization;
 
-namespace Statikk_Data.DTOs;
+namespace Statikk_Data.DTOs.RiotApi;
 
-public readonly record struct Participant(
+public readonly record struct RiotApiParticipant(
     [property: JsonPropertyName("puuid")] string Puuid,
     [property: JsonPropertyName("riotIdGameName")] string GameName,
-    [property: JsonPropertyName("riotIdTagLine")] string TagLine,
+    [property: JsonPropertyName("riotIdTagline")] string TagLine,
     [property: JsonPropertyName("profileIcon")] short IconId,
     [property: JsonPropertyName("summonerLevel")] short Level,
     [property: JsonPropertyName("teamPosition")] string Role,
     [property: JsonPropertyName("teamId")] short TeamId,
     [property: JsonPropertyName("championId")] short ChampionId,
     [property: JsonPropertyName("champLevel")] short ChampionLevel,
-    [property: JsonPropertyName("perks")] Perks Perks,
+    [property: JsonPropertyName("perks")] RiotApiPerks Perks,
     [property: JsonPropertyName("summoner1Id")] short Spell1Id,
     [property: JsonPropertyName("summoner2Id")] short Spell2Id,
     [property: JsonPropertyName("kills")] short Kills,
@@ -25,5 +25,6 @@ public readonly record struct Participant(
     [property: JsonPropertyName("item4")] short Item5Id,
     [property: JsonPropertyName("item5")] short Item6Id,
     [property: JsonPropertyName("item6")] short WardId,
+    [property: JsonPropertyName("gameEndedInEarlySurrender")] bool GameEndedInEarlySurrender,
     [property: JsonPropertyName("win")] bool Won
 );
