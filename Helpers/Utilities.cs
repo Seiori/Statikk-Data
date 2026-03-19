@@ -5,24 +5,24 @@ namespace Statikk_Data.Helpers;
 public static class Utilities
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string CreateCacheKey(string p1, string p2)
+    public static short ToPatchId(string patchVersion)
     {
-        return string.Create(p1.Length + p2.Length, (p1, p2), (span, state) =>
+        var parts = patchVersion.Split('.');
+        if (parts.Length >= 2 &&
+            short.TryParse(parts[0], out var major) &&
+            short.TryParse(parts[1], out var minor)
+        )
         {
-            state.p1.AsSpan().CopyTo(span);
-            state.p2.AsSpan().CopyTo(span[state.p1.Length..]);
-        });
+            return (short)(major * 100 + minor);
+        }
+        return 0;
     }
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string CreateCacheKey(string p1, string p2, string p3)
+    public static string ToPatchVersion(short patchId)
     {
-        return string.Create(p1.Length + p2.Length + p3.Length, (p1, p2, p3), (span, state) =>
-        {
-            var pos = 0;
-            state.p1.AsSpan().CopyTo(span[pos..]); pos += state.p1.Length;
-            state.p2.AsSpan().CopyTo(span[pos..]); pos += state.p2.Length;
-            state.p3.AsSpan().CopyTo(span[pos..]);
-        });
+        var major = patchId / 100;
+        var minor = patchId % 100;
+        return $"{major}.{minor}";
     }
 }

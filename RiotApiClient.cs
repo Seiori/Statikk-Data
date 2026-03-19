@@ -48,7 +48,7 @@ public sealed class RiotApiClient
         return await SendInternalAsync(routeRateLimiter, routeMethodRateLimiter, url, typeInfo, ct);
     }
 
-    public async Task<T> SendAsync<T>(
+    public async Task<T?> SendAsync<T>(
         PlatformRoute platformRoute,
         Methods method,
         string url,
@@ -62,7 +62,7 @@ public sealed class RiotApiClient
         return await SendInternalAsync(routeRateLimiter, routeMethodRateLimiter, url, typeInfo, cancellationToken);
     }
 
-    private async Task<T> SendInternalAsync<T>(
+    private async Task<T?> SendInternalAsync<T>(
         RateLimiter routeRateLimiter,
         RateLimiter routeMethodRateLimiter,
         string url, 
@@ -81,18 +81,29 @@ public sealed class RiotApiClient
 
                 await SyncAll(routeRateLimiter, routeMethodRateLimiter, response.Headers);
 
-                if (response.StatusCode is HttpStatusCode.TooManyRequests)
+                if (response.IsSuccessStatusCode)
                 {
-                    var retryAfter = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5);
-                    await Task.Delay(retryAfter, cancellationToken);
-                    continue;
+                    await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    
+                    return await System.Text.Json.JsonSerializer.DeserializeAsync(stream, typeInfo, cancellationToken);
                 }
-
-                response.EnsureSuccessStatusCode();
-
-                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                var result = await System.Text.Json.JsonSerializer.DeserializeAsync(stream, typeInfo, cancellationToken);
-                return result;
+                
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.TooManyRequests:
+                    {
+                        var retryAfter = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(attempt);
+                        
+                        await Task.Delay(retryAfter, cancellationToken);
+                        
+                        continue;
+                    }
+                    case HttpStatusCode.NotFound:
+                        return default;
+                    default:
+                        response.EnsureSuccessStatusCode();
+                        break;
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

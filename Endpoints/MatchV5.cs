@@ -13,12 +13,13 @@ public sealed class MatchV5(
         int start = 0,
         int count = 20,
         long startTime = 0,
+        long endTime = 0,
         CancellationToken cancellationToken = default
     )
     {
         const string path = "lol/match/v5/matches/by-puuid";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(regionalRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(regionalRoute));
 
         url.AppendPath(path);
         url.AppendPath(puuid);
@@ -27,6 +28,7 @@ public sealed class MatchV5(
         url.AppendQuery("start", start); 
         url.AppendQuery("count", count);
         url.AppendQuery("startTime", startTime);
+        url.AppendQuery("endTime", endTime);
         
         return await riotApiClient.SendAsync(
             regionalRoute,
@@ -45,7 +47,7 @@ public sealed class MatchV5(
     {
         const string path = "lol/match/v5/matches";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(regionalRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(regionalRoute));
         
         url.AppendPath(path);
         url.AppendPath(matchId);

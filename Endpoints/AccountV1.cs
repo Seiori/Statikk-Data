@@ -14,7 +14,7 @@ public sealed class AccountV1(
     {
         const string path = "riot/account/v1/accounts/by-puuid";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(RegionalRoute.Europe));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(RegionalRoute.Europe));
         
         url.AppendPath(path);
         url.AppendPath(puuid);
@@ -36,7 +36,7 @@ public sealed class AccountV1(
     {
         const string path = "riot/account/v1/accounts/by-riot-id";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(RegionalRoute.Europe));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(RegionalRoute.Europe));
         
         url.AppendPath(path);
         url.AppendPath(gameName);
@@ -58,7 +58,7 @@ public sealed class AccountV1(
     {
         const string path = "riot/account/v1/region/by-game/lol/by-puuid";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(RegionalRoute.Europe));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(RegionalRoute.Europe));
         
         url.AppendPath(path);
         url.AppendPath(puuid);

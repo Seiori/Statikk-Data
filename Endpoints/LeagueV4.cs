@@ -15,7 +15,7 @@ public sealed class LeagueV4(
     {
         const string path = "lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(platformRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(platformRoute));
         
         url.AppendPath(path);
         
@@ -38,7 +38,7 @@ public sealed class LeagueV4(
     {
         const string path = "lol/league-exp/v4/entries/RANKED_SOLO_5x5";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(platformRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(platformRoute));
         
         url.AppendPath(path);
         url.AppendPath(tier.GetStringUpperCase());
@@ -64,7 +64,7 @@ public sealed class LeagueV4(
     {
         const string path = "lol/league/v4/entries/RANKED_SOLO_5x5";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(platformRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(platformRoute));
         
         url.AppendPath(path);
         url.AppendPath(tier.GetStringUpperCase());
@@ -87,7 +87,7 @@ public sealed class LeagueV4(
     {
         const string path = "lol/league/v4/grandmasterleagues/by-queue/RANKED_SOLO_5x5";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(platformRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(platformRoute));
         
         url.AppendPath(path);
         
@@ -107,7 +107,7 @@ public sealed class LeagueV4(
     {
         const string path = "lol/league/v4/masterleagues/by-queue/RANKED_SOLO_5x5";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(platformRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(platformRoute));
         
         url.AppendPath(path);
         

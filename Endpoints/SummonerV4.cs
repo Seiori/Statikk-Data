@@ -15,7 +15,7 @@ public sealed class SummonerV4(
     {
         const string path = "lol/summoner/v4/summoners/by-puuid";
         Span<char> buffer = stackalloc char[256];
-        var url = new RiotUrlBuilder(buffer, RiotApi.GetUrl(platformRoute));
+        var url = new RiotUrlBuilder(buffer, RiotApi.GetBaseUrl(platformRoute));
         
         url.AppendPath(path);
         url.AppendPath(puuid);

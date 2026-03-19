@@ -2,7 +2,9 @@ namespace Statikk_Data.ENUMs;
 
 public enum RegionalRoute : byte
 {
+    None,
     Americas,
     Asia,
-    Europe
+    Europe,
+    Sea
 }

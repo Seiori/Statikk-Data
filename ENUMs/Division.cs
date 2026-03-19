@@ -4,13 +4,13 @@ namespace Statikk_Data.ENUMs;
 
 public enum Division : byte
 {
-    None,
+    None = 0,
     [JsonPropertyName("I")]
-    One,
+    One = 1,
     [JsonPropertyName("II")]
-    Two,
+    Two = 2,
     [JsonPropertyName("III")]
-    Three,
+    Three = 3,
     [JsonPropertyName("IV")]
-    Four,
+    Four = 4,
 }
