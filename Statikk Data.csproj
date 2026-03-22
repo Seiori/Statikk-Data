@@ -6,6 +6,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
 
+        <RootNamespace>StatikkData</RootNamespace>
+        <PackageId>Seiori.StatikkData</PackageId>
+
         <Authors>Seiori</Authors>
         <Description>A Library to interact with the Riot API.</Description>
 
