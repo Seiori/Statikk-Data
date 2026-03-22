@@ -5,6 +5,17 @@
         <RootNamespace>Statikk_Data</RootNamespace>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+
+        <Authors>Seiori</Authors>
+        <Description>A Library to interact with the Riot API.</Description>
+
+        <RepositoryUrl>https://github.com/Seiori/Statikk-Data</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <ProjectUrl>https://github.com/Seiori/Statikk-Data</ProjectUrl>
+
+        <Version>0.0.1</Version>
+
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
