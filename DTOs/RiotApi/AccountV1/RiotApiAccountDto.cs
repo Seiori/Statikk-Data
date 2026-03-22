@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Statikk_Data.DTOs.RiotApi;
+namespace Statikk_Data.DTOs.RiotApi.AccountV1;
 
 public readonly record struct RiotApiAccountDto(
     [property: JsonPropertyName("puuid")] string Puuid,

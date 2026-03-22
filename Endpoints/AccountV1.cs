@@ -1,5 +1,7 @@
-using Statikk_Data.DTOs.RiotApi;
+using System.Text.Json.Serialization;
+using Statikk_Data.DTOs.RiotApi.AccountV1;
 using Statikk_Data.ENUMs;
+using Statikk_Data.Features.RiotApiClient;
 
 namespace Statikk_Data.Endpoints;
 
@@ -23,9 +25,9 @@ public sealed class AccountV1(
             RegionalRoute.Europe,
             Methods.GetAccountByPuuidAsync,
             url.ToString(),
-            RiotApiJsonContext.Default.RiotApiAccountDto,
+            AccountV1JsonContext.Default.RiotApiAccountDto,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
     }
     
     public async Task<RiotApiAccountDto?> GetAccountByRiotIdAsync(
@@ -46,9 +48,9 @@ public sealed class AccountV1(
             RegionalRoute.Europe,
             Methods.GetAccountByRiotIdAsync,
             url.ToString(),
-            RiotApiJsonContext.Default.RiotApiAccountDto,
+            AccountV1JsonContext.Default.RiotApiAccountDto,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
     }
     
     public async Task<RiotApiAccountRegionDto?> GetAccountRegionByPuuidAsync(
@@ -67,8 +69,12 @@ public sealed class AccountV1(
             RegionalRoute.Europe,
             Methods.GetAccountRegionByPuuidAsync,
             url.ToString(),
-            RiotApiJsonContext.Default.RiotApiAccountRegionDto,
+            AccountV1JsonContext.Default.RiotApiAccountRegionDto,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
     }
 }
+
+[JsonSerializable(typeof(RiotApiAccountDto))]
+[JsonSerializable(typeof(RiotApiAccountRegionDto))]
+internal partial class AccountV1JsonContext : JsonSerializerContext;

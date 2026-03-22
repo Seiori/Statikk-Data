@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Statikk_Data.DTOs.Assets;
 using Statikk_Data.ENUMs;
+using Statikk_Data.Features.RiotApiClient;
 using Statikk_Data.Helpers;
 
 namespace Statikk_Data.Workers;
@@ -32,33 +33,31 @@ public class StatikkData(
     private const string PatchVersionsUrl = "https://ddragon.leagueoflegends.com/api/versions.json";
     
     private volatile AssetSnapshot _snapshot = AssetSnapshot.Empty;
-    private volatile IReadOnlyList<string> _patchVersions = [];
-    private volatile IReadOnlyList<short> _patchIds = [];
+    
+    private volatile string[] _patchVersions = [];
+    private volatile short[] _patchIds = [];
+    
     private readonly TaskCompletionSource _initialLoadComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public IReadOnlyList<string> PatchVersions => _patchVersions;
-    public IReadOnlyList<short> PatchIds => _patchIds;
+    public string[] PatchVersions => _patchVersions;
+    public short[] PatchIds => _patchIds;
 
-    public IReadOnlyDictionary<long, Asset> Champions => _snapshot.Champions;
-    public IReadOnlyDictionary<long, Asset> Icons => _snapshot.Icons;
-    public IReadOnlyDictionary<long, Asset> Items => _snapshot.Items;
-    public IReadOnlyDictionary<long, Asset> Spells => _snapshot.Spells;
-    public IReadOnlyDictionary<long, Asset> Runes => _snapshot.Runes;
-    public IReadOnlyDictionary<long, Asset> RunePaths => _snapshot.RunePaths;
-
-    public IEnumerable<Asset> AllChampions => Champions.Values;
-    public IEnumerable<Asset> AllIcons => Icons.Values;
-    public IEnumerable<Asset> AllItems => Items.Values;
-    public IEnumerable<Asset> AllSpells => Spells.Values;
-    public IEnumerable<Asset> AllRunes => Runes.Values;
-    public IEnumerable<Asset> AllRunePaths => RunePaths.Values;
+    public FrozenDictionary<long, Asset> Champions => _snapshot.Champions;
+    public FrozenDictionary<long, Asset> Icons => _snapshot.Icons;
+    public FrozenDictionary<long, Asset> Items => _snapshot.Items;
+    public FrozenDictionary<long, Asset> Spells => _snapshot.Spells;
+    public FrozenDictionary<long, Asset> Runes => _snapshot.Runes;
+    public FrozenDictionary<long, Asset> RunePaths => _snapshot.RunePaths;
 
     private static readonly FrozenDictionary<Tier, string> TierUrlCache;
 
     static StatikkData()
     {
-        TierUrlCache = TierExtensions.GetValues().ToArray()
-            .ToFrozenDictionary(t => t, t => $"https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-shared-components/global/default/images/{t.GetStringLowerCase()}.png");
+        TierUrlCache = RiotApi.Tiers
+            .ToFrozenDictionary(
+                tier => tier, 
+                tier => $"https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-shared-components/global/default/images/{tier.GetStringLowerCase()}.png"
+            );
     }
 
     public static string GetImageUrl(string path) => FormatUrl(path);
@@ -73,24 +72,28 @@ public class StatikkData(
     public Asset GetSpell(long id) => Spells.GetValueOrDefault(id, Fallback);
 
     protected override async Task ExecuteAsync(
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        while (!ct.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                await RefreshAsync();
+                await RefreshAsync().ConfigureAwait(false);
+                
                 _initialLoadComplete.TrySetResult();
                 logger.LogInformation("Assets refreshed.");
             }
-            catch (Exception ex) { logger.LogError(ex, "Refresh failed."); }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Assets refresh failed.");
+            }
             
             try
             {
-                await Task.Delay(_refreshInterval, ct);
+                await Task.Delay(_refreshInterval, cancellationToken).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 break;
             }
@@ -99,7 +102,7 @@ public class StatikkData(
 
     private async Task RefreshAsync()
     {
-        using var client = httpClientFactory.CreateClient("CommunityDragon");
+        using var client = httpClientFactory.CreateClient("StatikkDataClient");
 
         var championsTask = Fetch(client, $"{BaseDataUrl}/champion-summary.json");
         var iconsTask = Fetch(client, $"{BaseDataUrl}/summoner-icons.json");
@@ -117,7 +120,7 @@ public class StatikkData(
             runesTask,
             runePathsTask,
             patchVersionsTask
-        );
+        ).ConfigureAwait(false);
 
         _snapshot = new AssetSnapshot(
             championsTask.Result,
@@ -130,27 +133,33 @@ public class StatikkData(
 
         var patchVersions = patchVersionsTask.Result;
         _patchVersions = patchVersions;
-        _patchIds = patchVersions.Select(Utilities.ToPatchId).ToList();
+        _patchIds = patchVersions.Select(Utilities.ToPatchId).ToArray();
     }
 
     private static async Task<FrozenDictionary<long, Asset>> Fetch(HttpClient c, string url)
     {
-        var data = await c.GetFromJsonAsync(url, AssetJsonContext.Default.AssetArray);
+        var data = await c.GetFromJsonAsync(url, AssetJsonContext.Default.AssetArray).ConfigureAwait(false);
         return data?.DistinctBy(x => x.Id).ToFrozenDictionary(x => x.Id) ?? FrozenDictionary<long, Asset>.Empty;
     }
 
     private static async Task<FrozenDictionary<long, Asset>> FetchRunePaths(HttpClient c)
     {
-        using var doc = await JsonDocument.ParseAsync(await c.GetStreamAsync($"{BaseDataUrl}/perkstyles.json"));
+        using var doc = await JsonDocument.ParseAsync(await c.GetStreamAsync($"{BaseDataUrl}/perkstyles.json")).ConfigureAwait(false);
         return doc.RootElement.TryGetProperty("styles", out var el) 
-            ? el.Deserialize(AssetJsonContext.Default.AssetArray)?.ToFrozenDictionary(x => x.Id) ?? FrozenDictionary<long, Asset>.Empty 
+            ? el.Deserialize(AssetJsonContext.Default.AssetArray)?
+                .Where(x => x.Id > 0)
+                .DistinctBy(x => x.Id)
+                .ToFrozenDictionary(x => x.Id) ?? FrozenDictionary<long, Asset>.Empty 
             : FrozenDictionary<long, Asset>.Empty;
     }
 
-    private static async Task<IReadOnlyList<string>> FetchPatchVersions(HttpClient c)
+    private static async Task<string[]> FetchPatchVersions(HttpClient c)
     {
         var versions = await c.GetFromJsonAsync<string[]>(PatchVersionsUrl);
-        if (versions is null || versions.Length == 0) return [];
+        if (versions is null || versions.Length == 0)
+        {
+            return [];
+        }
 
         return versions
             .Select(v =>
@@ -161,16 +170,23 @@ public class StatikkData(
             .Where(v => v is not null)
             .Distinct()
             .Take(3)
-            .ToList()!;
+            .ToArray()!;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static string FormatUrl(string? path)
     {
-        if (string.IsNullOrEmpty(path)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+        
         const string prefix = "/lol-game-data/assets";
         var span = path.AsSpan();
-        if (!span.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return path.ToLowerInvariant();
+        if (!span.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return path.ToLowerInvariant();
+        }
 
         return string.Create(CdnUrl.Length + (span.Length - prefix.Length), (path, prefix.Length), (dest, state) => {
             CdnUrl.AsSpan().CopyTo(dest);
@@ -190,7 +206,7 @@ public class StatikkData(
         public static readonly AssetSnapshot Empty = new(
             FrozenDictionary<long, Asset>.Empty, 
             FrozenDictionary<long, Asset>.Empty, 
-            FrozenDictionary<long, Asset>.Empty, 
+            FrozenDictionary<long, Asset>.Empty,
             FrozenDictionary<long, Asset>.Empty, 
             FrozenDictionary<long, Asset>.Empty, 
             FrozenDictionary<long, Asset>.Empty
@@ -198,6 +214,5 @@ public class StatikkData(
     }
 }
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, GenerationMode = JsonSourceGenerationMode.Default)]
 [JsonSerializable(typeof(Asset[]))]
 internal partial class AssetJsonContext : JsonSerializerContext;

@@ -1,8 +1,8 @@
-using Statikk_Data.ENUMs;
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
+using Statikk_Data.ENUMs;
 
-namespace Statikk_Data;
+namespace Statikk_Data.Features.RiotApiClient;
 
 public static class RiotApi
 {

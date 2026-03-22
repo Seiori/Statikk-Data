@@ -1,4 +1,8 @@
+using System.Globalization;
+using System.IO.Hashing;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Statikk_Data.ENUMs;
 
 namespace Statikk_Data.Helpers;
 
@@ -24,5 +28,75 @@ public static class Utilities
         var major = patchId / 100;
         var minor = patchId % 100;
         return $"{major}.{minor}";
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static long HashPuuid(
+        string puuid
+    )
+    {
+        return (long)XxHash64.HashToUInt64(
+            MemoryMarshal.AsBytes(
+                puuid.AsSpan()
+            )
+        );
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryParseMatchId(
+        string matchId, 
+        out PlatformRoute platformRoute, 
+        out long gameId
+    )
+    {
+        platformRoute = default;
+        gameId = 0;
+
+        ReadOnlySpan<char> span = matchId;
+        var sep = span.IndexOf('_');
+
+        if (sep < 0)
+        {
+            return false;
+        }
+
+        if (!PlatformRouteExtensions.TryParse(span[..sep], out platformRoute))
+        {
+            return false;
+        }
+
+        return long.TryParse(
+            span[(sep + 1)..],
+            NumberStyles.None, 
+            CultureInfo.InvariantCulture, 
+            out gameId
+        );
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryGetMatchId(
+        PlatformRoute platform, 
+        long gameId, 
+        out string matchId
+    )
+    {
+        matchId = string.Empty;
+        ReadOnlySpan<char> platformSpan = platform.GetStringUpperCase();
+    
+        Span<char> buffer = stackalloc char[64];
+        var position = 0;
+
+        platformSpan.CopyTo(buffer);
+        position += platformSpan.Length;
+
+        buffer[position++] = '_';
+
+        if (!gameId.TryFormat(buffer[position..], out var gameIdChars, default, CultureInfo.InvariantCulture))
+        {
+            return false;
+        }
+
+        position += gameIdChars;
+        matchId = new string(buffer[..position]);
+        return true;
     }
 }

@@ -1,4 +1,4 @@
-namespace Statikk_Data;
+namespace Statikk_Data.Features.RiotApiClient;
 
 public ref struct RiotUrlBuilder
 {

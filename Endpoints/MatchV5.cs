@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
 using Statikk_Data.DTOs.RiotApi;
+using Statikk_Data.DTOs.RiotApi.MatchV5;
 using Statikk_Data.ENUMs;
+using Statikk_Data.Features.RiotApiClient;
 
 namespace Statikk_Data.Endpoints;
 
@@ -34,9 +37,9 @@ public sealed class MatchV5(
             regionalRoute,
             Methods.GetMatchIdsByPuuidAsync,
             url.ToString(),
-            RiotApiJsonContext.Default.StringArray,
+            MatchV5JsonContext.Default.StringArray,
             cancellationToken
-        ) ?? [];
+        ).ConfigureAwait(false) ?? [];
     }
 
     public async Task<RiotApiMatch?> GetMatchByMatchIdAsync(
@@ -56,8 +59,12 @@ public sealed class MatchV5(
             regionalRoute,
             Methods.GetMatchByMatchIdAsync,
             url.ToString(),
-            RiotApiJsonContext.Default.RiotApiMatch,
+            MatchV5JsonContext.Default.RiotApiMatch,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
     }
 }
+
+[JsonSerializable(typeof(string[]))]
+[JsonSerializable(typeof(RiotApiMatch))]
+internal partial class MatchV5JsonContext : JsonSerializerContext;
