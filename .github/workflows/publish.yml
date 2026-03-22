@@ -17,11 +17,11 @@ jobs:
         dotnet-version: 10.0.x 
 
     - name: Restore
-      run: dotnet restore "Statikk Data/Statikk Data.csproj"
+      run: dotnet restore "Statikk Data.csproj"
 
     - name: Pack
       run: |
-        dotnet pack "Statikk Data/Statikk Data.csproj" \
+        dotnet pack "Statikk Data.csproj" \
         --configuration Release \
         --output ./nupkg \
         -p:PackageVersion=${{ github.event.release.tag_name }}
